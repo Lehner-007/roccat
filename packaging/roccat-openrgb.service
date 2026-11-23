@@ -1,0 +1,22 @@
+[Unit]
+Description=OpenRGB SDK for ROCCAT Magma and Kone Pro
+After=systemd-udev-trigger.service
+
+[Service]
+Type=simple
+User=roccat-openrgb
+Group=roccat-openrgb
+StateDirectory=roccat-openrgb
+UMask=0077
+Environment=HOME=/var/lib/roccat-openrgb
+Environment=QT_QPA_PLATFORM=offscreen
+ExecStart=/usr/lib/roccat/system/openrgb-service
+Restart=always
+RestartSec=3
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

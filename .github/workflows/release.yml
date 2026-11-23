@@ -1,0 +1,30 @@
+name: Build and publish DEB
+
+on:
+  push:
+    branches: [main]
+    paths: [VERSION, .github/workflows/release.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch upstream OpenRGB and build package
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/OpenRGB.AppImage" https://codeberg.org/OpenRGB/OpenRGB/releases/download/release_1.1/OpenRGB_1.1_x86_64_8e16de2.AppImage
+          OPENRGB_APPIMAGE="$RUNNER_TEMP/OpenRGB.AppImage" ./packaging/build-deb.sh
+          (cd dist && sha256sum ./*.deb > SHA256SUMS)
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(cat VERSION)
+          tag="v$version"
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --target "$GITHUB_SHA" --title "roccat $version" --notes "Linux Mint 22.x (amd64). Includes the local OpenRGB SDK boot service and desktop launcher. OpenRGB 1.1 corresponding source: https://codeberg.org/OpenRGB/OpenRGB/src/tag/release_1.1" dist/*.deb dist/SHA256SUMS
+          fi

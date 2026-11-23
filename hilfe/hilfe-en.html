@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>roccat – Help</title>
+<style>body{font:1rem/1.6 sans-serif;margin:2rem;color-scheme:light dark}a{color:LinkText}</style>
+<h1>roccat</h1>
+<p>Device overview and lighting profiles for the ROCCAT Magma and wired ROCCAT Kone Pro.</p>
+<nav aria-label="Table of contents"><ol>
+<li><a href="#devices">Devices</a></li><li><a href="#lighting">Lighting</a></li>
+<li><a href="#profiles">Profiles</a></li><li><a href="#diagnostics">OpenRGB connection</a></li>
+<li><a href="#keyboard">Keyboard</a></li><li><a href="#menus">Menus</a></li>
+</ol></nav>
+<h2 id="devices">Devices</h2>
+<p>Select a model at the top. The connection status appears below the model selector. Interfaces on the same USB device are grouped. Connecting or disconnecting updates the list.</p>
+<h2 id="lighting">Lighting</h2>
+<p>Select the USB device using its checkbox. roccat checks OpenRGB at startup and when switching devices. If the SDK server is unreachable at startup, a prompt appears. After starting OpenRGB, select “Check OpenRGB” to retry. Choose a mode and set any available LED areas. If the mode supports multiple colors, “Color for all areas” copies one color to each area. Brightness and speed only appear if the SDK reports support. Magma has up to five areas and Kone Pro has up to two. Verify the effect on the physical device.</p>
+<p>“Apply to device” sends the selected settings when clicked. Some modes may persist in device memory. Local profiles are separate. Starting the app leaves device settings alone, and no factory reset is offered.</p>
+<h2 id="profiles">Profiles</h2>
+<p>In the Profiles menu, “Save locally” stores your draft as a user-owned JSON file. “Load profile” selects an existing profile for the chosen model. Settings are staged when compatible SDK capabilities are available. “Duplicate” makes a separately named copy. “Rename” moves a profile to a new name. Existing names are protected.</p>
+<p>Use the same menu to import or export JSON profiles. Import checks the format, backend and model. These file operations leave the USB device alone.</p>
+<h2 id="diagnostics">OpenRGB connection</h2>
+<p>Use a local OpenRGB SDK server on port 6742. roccat checks the connection and matches the controller by name, type and HID interface. If matching fails, check OpenRGB detection, permissions and competing services. VM tests require USB passthrough for the respective device.</p>
+<p>If HID access is blocked, an administrator can install the supplied system/70-roccat-hidraw.rules file in /etc/udev/rules.d and reload the rules. This grants access to the HID interfaces of the two models for the active local session. Then reconnect the devices one at a time.</p>
+<p>Run Installieren.sh as a regular user during installation. It sets OpenRGB up as a user service at boot. The SDK server listens on 127.0.0.1:6742. The udev device permissions take effect for the active local session.</p>
+<h2 id="keyboard">Keyboard</h2>
+<p>Keyboard remapping and custom shortcuts were deliberately left out of roccat. Linux Mint Cinnamon already provides these controls under <strong>System Settings → Keyboard → Layouts</strong> and <strong>Shortcuts</strong>. roccat focuses on lighting.</p>
+<h2 id="menus">Menus</h2>
+<p>Change the language under File → Settings. It takes effect immediately. File → Quit or Q closes the app. Help contains this guide (F1), About with Info and Credits, and the log file. A fresh log starts every time the application launches. It displays entries in the current language and records status and errors without keystrokes or profile content.</p>
+</html>

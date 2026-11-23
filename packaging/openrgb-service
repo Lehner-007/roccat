@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+if [ ! -e "$STATE_DIRECTORY/OpenRGB.json" ]; then
+    install -m 0600 /usr/lib/roccat/system/OpenRGB.json "$STATE_DIRECTORY/OpenRGB.json"
+fi
+exec /usr/lib/roccat/system/OpenRGB.AppImage --appimage-extract-and-run \
+    --config "$STATE_DIRECTORY" --noautoconnect --server --server-host 127.0.0.1

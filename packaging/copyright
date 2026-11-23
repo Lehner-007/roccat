@@ -1,0 +1,18 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: roccat
+
+Files: /usr/lib/roccat/system/OpenRGB.AppImage
+Source: https://codeberg.org/OpenRGB/OpenRGB/src/tag/release_1.1
+Comment: Original upstream OpenRGB 1.1 x86_64 AppImage, commit 8e16de27858cf2be6af54a33ce003df74cb9fd3e.
+ OpenRGB is GPL-2.0-only overall. Refer to the upstream tag for source and bundled library licensing.
+ The pristine release asset is available alongside the corresponding upstream source.
+License: GPL-2.0-only
+ On Debian systems, the GNU GPL version 2 is available in /usr/share/common-licenses/GPL-2.
+
+Files: /usr/lib/roccat/referenzen/original/openrgb-python/*
+Source: https://github.com/jath03/openrgb-python/tree/7b23654ff7e0
+License: GPL-3
+ The upstream license is bundled alongside the module.
+
+Files: /usr/lib/roccat/bilder/Roccat.svg
+Comment: ROCCAT logo supplied by the user for identification.

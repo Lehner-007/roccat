@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="de"><meta charset="utf-8"><title>roccat – Hilfe</title>
+<style>body{font:1rem/1.6 sans-serif;margin:2rem;color-scheme:light dark}a{color:LinkText}</style>
+<h1>roccat</h1>
+<p>Geräteübersicht und Beleuchtungsprofile für ROCCAT Magma und kabelgebundene ROCCAT Kone Pro.</p>
+<nav aria-label="Inhaltsverzeichnis"><ol>
+<li><a href="#devices">Geräte</a></li><li><a href="#lighting">Beleuchtung</a></li>
+<li><a href="#profiles">Profile</a></li><li><a href="#diagnostics">OpenRGB-Verbindung</a></li>
+<li><a href="#keyboard">Tastatur</a></li><li><a href="#menus">Menüs</a></li>
+</ol></nav>
+<h2 id="devices">Geräte</h2>
+<p>Oben eines der beiden Modelle auswählen. Der Verbindungsstatus steht unter der Geräteauswahl. Mehrere Schnittstellen am selben USB-Anschluss gehören zu einem Gerät. Die Liste aktualisiert sich beim An- und Abstecken.</p>
+<h2 id="lighting">Beleuchtung</h2>
+<p>Wähle das gewünschte USB-Gerät per Ankreuzfeld. roccat prüft OpenRGB beim Start und beim Gerätewechsel. Ist der SDK-Server beim Start nicht erreichbar, erscheint eine Aufforderung. Nach dem Start von OpenRGB kannst du über „OpenRGB prüfen“ erneut verbinden. Modus und verfügbare LED-Bereiche auswählen. Bei mehreren Farbbereichen übernimmt „Farbe für alle Bereiche“ den ausgewählten Farbton in jeden Bereich. Helligkeit und Tempo erscheinen nur bei gemeldeter Unterstützung. Die Magma hat bis zu fünf Bereiche, die Kone Pro bis zu zwei. Die Anwendung zeigt die vom lokalen OpenRGB SDK gemeldeten Möglichkeiten. Die Wirkung muss am Gerät geprüft werden.</p>
+<p>„Auf Gerät anwenden“ sendet die gewählten Einstellungen direkt beim Klick. Manche Modi können Änderungen dauerhaft im Gerät hinterlegen. Ein lokales Profil ist unabhängig davon. Die Anwendung startet ohne Geräteänderung und bietet keinen Werksreset.</p>
+<h2 id="profiles">Profile</h2>
+<p>Im Menü „Profile“ speichert „Lokal speichern“ den aktuellen Entwurf als benutzereigene JSON-Datei. „Profil laden“ wählt ein gespeichertes Profil des ausgewählten Modells. Die Einstellungen werden vorbereitet, sobald OpenRGB passende Fähigkeiten gemeldet hat. „Duplizieren“ erstellt eine Kopie unter einem neuen Namen. „Umbenennen“ verschiebt das Profil zum neuen Namen. Bestehende Namen werden geschützt.</p>
+<p>Im selben Menü kannst du diese JSON-Profile importieren und exportieren. Der Import prüft Format, Backend und Gerätetyp. Diese Dateivorgänge ändern das USB-Gerät nicht.</p>
+<h2 id="diagnostics">OpenRGB-Verbindung</h2>
+<p>Für OpenRGB den SDK-Server lokal auf Port 6742 verwenden. roccat prüft die Verbindung und ordnet den Controller über Name, Typ und HID-Schnittstelle dem USB-Gerät zu. Bei Zuordnungsfehlern OpenRGB-Erkennung, Zugriffsrechte und konkurrierende Dienste prüfen. Für Tests in der VM das jeweilige USB-Gerät durchreichen.</p>
+<p>Wird der HID-Zugriff als gesperrt angezeigt, kann ein Administrator die mitgelieferte Regel system/70-roccat-hidraw.rules unter /etc/udev/rules.d installieren und die Regeln neu laden. Die Regel gewährt nur der aktiven lokalen Sitzung Zugriff auf die HID-Schnittstellen dieser beiden Modelle. Anschließend die Geräte einzeln neu verbinden.</p>
+<p>Führe bei der Installation Installieren.sh als normaler Benutzer aus. Das Skript richtet OpenRGB als Benutzerdienst beim Hochfahren ein. Der SDK-Server lauscht auf 127.0.0.1:6742. Die udev-Gerätefreigabe wird für die aktive lokale Sitzung wirksam.</p>
+<h2 id="keyboard">Tastatur</h2>
+<p>Die Tastaturbelegung und eigene Tastenkürzel wurden bewusst nicht in roccat eingebaut. Linux Mint Cinnamon bietet dafür bereits die funktionierenden Einstellungen unter <strong>Systemeinstellungen → Tastatur → Tastaturbelegungen</strong> und <strong>Tastenkombinationen</strong>. roccat konzentriert sich auf die Beleuchtung.</p>
+<h2 id="menus">Menüs</h2>
+<p>Unter Datei → Einstellungen die Sprache wechseln. Sie wird sofort übernommen. Datei → Beenden oder Q schließt das Programm. Unter Hilfe stehen diese Anleitung (F1), Über mit Info und Mitwirkenden sowie das Protokoll bereit. Bei jedem Programmstart beginnt ein neues Protokoll. Es zeigt Einträge in der aktuell eingestellten Sprache und enthält Zustände und Fehler ohne Tastatureingaben oder Profilinhalte.</p>
+</html>

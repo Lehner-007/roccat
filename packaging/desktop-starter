@@ -1,0 +1,85 @@
+#!/bin/sh
+set -eu
+
+managed=/usr/lib/roccat/roccat.desktop
+registry=/var/lib/roccat-package
+marker='X-Roccat-Managed=true'
+
+# Everything below this branch runs as the owner of the desktop.
+case "$1" in
+    user-install|user-remove)
+        desktop=$(xdg-user-dir DESKTOP)
+        case "$desktop" in
+            /*) ;;
+            *) exit 0 ;;
+        esac
+        if [ "$desktop" != "$HOME" ] && [ -d "$desktop" ]; then
+            starter="$desktop/roccat.desktop"
+            if [ "$1" = user-install ]; then
+                if [ -e "$starter" ] || [ -L "$starter" ]; then
+                    [ ! -L "$starter" ] && grep -Fxq "$marker" "$starter" || exit 0
+                fi
+                temporary=$(mktemp "$desktop/.roccat.XXXXXX")
+                trap 'rm -f -- "$temporary"' EXIT
+                install -m 0755 "$managed" "$temporary"
+                mv -fT -- "$temporary" "$starter"
+                gio set "$starter" metadata::trusted true 2>/dev/null || true
+            elif [ ! -L "$starter" ] && [ -f "$starter" ] && grep -Fxq "$marker" "$starter"; then
+                rm -f -- "$starter"
+            fi
+        fi
+        if [ "$1" = user-remove ]; then
+            state="${XDG_STATE_HOME:-$HOME/.local/state}/local.labor.roccat"
+            rm -f -- "$state/programm.log" "$state/programm.log.1" "$state/programm.log.2"
+            rmdir -- "$state" 2>/dev/null || true
+        fi
+        exit 0
+        ;;
+esac
+
+run_for_user() {
+    uid=$1
+    action=$2
+    case "$uid" in ''|*[!0-9]*) return 0 ;; esac
+    [ "$uid" -ge 1000 ] && [ "$uid" -ne 65534 ] || return 0
+    account=$(getent passwd "$uid") || return 0
+    username=$(printf '%s\n' "$account" | cut -d: -f1)
+    home=$(printf '%s\n' "$account" | cut -d: -f6)
+    [ -d "$home" ] || return 0
+    if /usr/sbin/runuser -u "$username" -- env -i HOME="$home" PATH=/usr/bin:/bin \
+        XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
+        "$0" "user-$action"; then
+        if [ "$action" = install ]; then
+            touch "$registry/users/$uid"
+        fi
+    else
+        printf 'roccat: desktop starter %s failed for UID %s\n' "$action" "$uid" >&2
+    fi
+}
+
+case "$1" in
+    install)
+        install -d -m 0700 "$registry" "$registry/users"
+        {
+            printf '%s\n' "${SUDO_UID:-}"
+            loginctl list-sessions --no-legend 2>/dev/null | awk '{print $1}' |
+            while IFS= read -r session; do
+                kind=$(loginctl show-session "$session" -p Type --value 2>/dev/null) || continue
+                case "$kind" in x11|wayland) ;; *) continue ;; esac
+                [ "$(loginctl show-session "$session" -p Remote --value 2>/dev/null)" = no ] || continue
+                loginctl show-session "$session" -p User --value 2>/dev/null || true
+            done
+        } | sort -u | while IFS= read -r uid; do
+            run_for_user "$uid" install
+        done
+        ;;
+    remove)
+        for record in "$registry/users/"*; do
+            [ -f "$record" ] || continue
+            run_for_user "${record##*/}" remove
+            rm -f -- "$record"
+        done
+        rmdir "$registry/users" "$registry" 2>/dev/null || true
+        ;;
+    *) exit 2 ;;
+esac

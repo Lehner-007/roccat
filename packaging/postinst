@@ -1,0 +1,23 @@
+#!/bin/sh
+set -e
+if [ "$1" = configure ]; then
+    /usr/lib/roccat/system/desktop-starter install
+    systemd-sysusers /usr/lib/sysusers.d/roccat-openrgb.conf
+    if [ -S /run/udev/control ]; then
+        udevadm control --reload-rules
+        for device in /sys/bus/usb/devices/*; do
+            [ -r "$device/idVendor" ] && [ -r "$device/idProduct" ] || continue
+            [ "$(cat "$device/idVendor")" = 1e7d ] || continue
+            case "$(cat "$device/idProduct")" in
+                3124|2c88)
+                    udevadm trigger --action=add --settle --subsystem-match=hidraw --parent-match="$device"
+                    ;;
+            esac
+        done
+    fi
+    deb-systemd-helper enable roccat-openrgb.service
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload
+        deb-systemd-invoke restart roccat-openrgb.service
+    fi
+fi

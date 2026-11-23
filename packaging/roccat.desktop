@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=roccat
+Comment=Configure ROCCAT lighting
+Comment[de]=ROCCAT-Beleuchtung einstellen
+Exec=/usr/bin/roccat
+Icon=/usr/lib/roccat/bilder/Roccat.svg
+Terminal=false
+Categories=Settings;HardwareSettings;
+X-Roccat-Managed=true
