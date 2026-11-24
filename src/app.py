@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 
 from devices import BackendError, MODELS, inventory, sdk_operation
 import profiles
+import lighting
 
 ROOT = Path(__file__).resolve().parents[1]
 shared_basis = ROOT.parent / ".basis"
@@ -15,6 +16,37 @@ sys.path.insert(0, str(local_basis if local_basis.is_dir() else shared_basis))
 from basis import BasisFenster, Gdk, GLib, Gtk
 
 TEXT = {
+    "always": ("Immer an", "Always on"),
+    "timed": ("Nach Inaktivität ausschalten", "Turn off after inactivity"),
+    "minutes": ("Minuten", "Minutes"),
+    "time_save": ("Speichern", "Save"),
+    "time_cancel": ("Abbrechen", "Cancel"),
+    "time_hint": (
+        "Jede Maus- oder Tastatureingabe in dieser Sitzung setzt beide Fristen zurück. "
+        "Die Zeitsteuerung benötigt ein angewendetes Direct-Profil und den Benutzerdienst.",
+        "Any mouse or keyboard activity in this session resets both timers. "
+        "Timing requires an applied Direct profile and the user service.",
+    ),
+    "time_saved": ("Zeiteinstellungen gespeichert.", "Timing settings saved."),
+    "time_error": ("Zeiteinstellungen konnten nicht gelesen oder gespeichert werden.",
+                   "Could not read or save timing settings."),
+    "time_on": ("An (OpenRGB)", "On (OpenRGB)"),
+    "time_idle_off": ("Wegen Inaktivität aus (OpenRGB)", "Off due to inactivity (OpenRGB)"),
+    "time_manual_off": ("Manuell ausgeschaltet", "Manually off"),
+    "time_disconnected": ("Gerät getrennt", "Device disconnected"),
+    "time_backend": ("Backend nicht verfügbar oder Controller nicht bestätigt",
+                     "Backend unavailable or controller unconfirmed"),
+    "time_configuration": ("Konfigurationsfehler", "Configuration error"),
+    "time_no_profile": ("Zuerst ein Lichtprofil anwenden", "Apply a lighting profile first"),
+    "time_idle_unavailable": (
+        "Diese Sitzung liefert keine Inaktivitätszeit. Die Zeitsteuerung ist deaktiviert.",
+        "This session provides no idle time. Timing is disabled.",
+    ),
+    "time_timer_unsupported": ("Dieser Modus unterstützt keine flüchtige Zeitsteuerung.",
+                              "This mode does not support temporary inactivity shutoff."),
+    "time_service": ("Benutzerdienst liefert noch keinen Status. Einrichtung siehe Hilfe.",
+                     "The user service has yet to report status. See Help for setup."),
+
     "lighting": ("Beleuchtung", "Lighting"),
     "input": ("Tasten und Schaltflächen", "Keys and buttons"),  # Existing log entries.
     "profiles": ("Profile", "Profiles"),
@@ -124,12 +156,15 @@ SDK_RETRY_STATES = {"offline", "dependency", "failed", "unmatched"}
 
 
 class Window(BasisFenster):
+    project_name = "roccat"
+    log_labels = {"de": "Protokoll", "en": "Log file"}
     logo_path = ROOT / "bilder" / "Roccat.svg"
     app_version = (ROOT / "VERSION").read_text().strip()
     reset_log_on_start = True
 
     def __init__(self, application):
         self.body = None
+        self.lighting_window = None
         super().__init__(application)
         self.resize(820, 630)
         self.device = None
@@ -252,6 +287,124 @@ class Window(BasisFenster):
         for key, (label, _) in self.parameter_fields.items():
             label.set_text(self.t(key))
         self.update_status()
+        if self.settings_window is not None and hasattr(self, "lighting_button"):
+            self.lighting_button.set_label(self.t("lighting"))
+        if self.lighting_window is not None:
+            self.translate_lighting_settings()
+
+    def show_settings(self):
+        new = self.settings_window is None
+        super().show_settings()
+        if new:
+            layout = self.settings_window.get_child()
+            self.lighting_button = Gtk.Button(label=self.t("lighting"), halign=Gtk.Align.START)
+            self.lighting_button.connect("clicked", lambda _: self.show_lighting_settings())
+            layout.pack_start(self.lighting_button, False, False, 0)
+            layout.reorder_child(self.lighting_button, 1)
+            self.lighting_button.show()
+
+    def show_lighting_settings(self):
+        if self.lighting_window is not None:
+            self.lighting_window.present()
+            return
+        window = self.child_window("lighting_window", self.t("lighting"), width=520)
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=18)
+        window.add(content)
+        self.time_hint = Gtk.Label(xalign=0, wrap=True, max_width_chars=58)
+        content.pack_start(self.time_hint, False, False, 0)
+        self.time_fields = {}
+        self.time_message = None
+        try:
+            options = lighting.preferences()
+        except (OSError, ValueError):
+            options = {}
+            self.time_message = "time_error"
+        for model, (name, _, _) in MODELS.items():
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5, margin=8)
+            frame = Gtk.Frame(label=name)
+            frame.add(box)
+            content.pack_start(frame, False, False, 0)
+            always = Gtk.RadioButton.new(None)
+            timed = Gtk.RadioButton.new_from_widget(always)
+            row = Gtk.Box(spacing=8)
+            minutes = Gtk.SpinButton.new_with_range(1, 240, 1)
+            minutes.set_numeric(True)
+            minutes_label = Gtk.Label()
+            minutes_label.set_mnemonic_widget(minutes)
+            row.pack_start(minutes_label, False, False, 0)
+            row.pack_start(minutes, False, False, 0)
+            state = Gtk.Label(xalign=0, wrap=True)
+            for widget in (always, timed, row, state):
+                box.pack_start(widget, False, False, 0)
+            entry = options.get(model, {"timed": False, "minutes": 10})
+            timed.set_active(entry["timed"])
+            minutes.set_value(entry["minutes"])
+            row.set_sensitive(entry["timed"])
+            timed.connect("toggled", lambda button, field=row: field.set_sensitive(button.get_active()))
+            self.time_fields[model] = (always, timed, minutes, minutes_label, state)
+        self.time_feedback = Gtk.Label(xalign=0, wrap=True)
+        content.pack_start(self.time_feedback, False, False, 0)
+        actions = Gtk.ButtonBox()
+        actions.set_layout(Gtk.ButtonBoxStyle.END)
+        self.time_save = Gtk.Button(sensitive=bool(options))
+        self.time_cancel = Gtk.Button()
+        self.time_save.connect("clicked", lambda _: self.save_lighting_settings())
+        self.time_cancel.connect("clicked", lambda _: window.destroy())
+        actions.add(self.time_cancel)
+        actions.add(self.time_save)
+        content.pack_start(actions, False, False, 0)
+        self.translate_lighting_settings()
+        timer = GLib.timeout_add_seconds(2, self.refresh_lighting_settings)
+        window.connect("destroy", lambda _: GLib.source_remove(timer))
+        window.show_all()
+
+    def refresh_lighting_settings(self):
+        supported = lighting.idle_seconds() is not None
+        hint = self.t("time_hint")
+        if not supported:
+            hint += "\n" + self.t("time_idle_unavailable")
+        self.time_hint.set_text(hint)
+        try:
+            states = lighting.status()
+            if not isinstance(states, dict):
+                states = {}
+        except (OSError, ValueError):
+            states = {}
+        connected = {device.product for device in inventory()}
+        for model, (_, timed, _, _, label) in self.time_fields.items():
+            timed.set_sensitive(supported)
+            state = states.get(model)
+            key = "time_" + (state if isinstance(state, str) else "service")
+            if model not in connected:
+                key = "time_disconnected"
+            elif not supported and timed.get_active():
+                key = "time_idle_unavailable"
+            label.set_text(self.t(key if key in TEXT else "time_service"))
+        return GLib.SOURCE_CONTINUE
+
+    def translate_lighting_settings(self):
+        self.lighting_window.set_title(self.t("lighting"))
+        self.time_save.set_label(self.t("time_save"))
+        self.time_cancel.set_label(self.t("time_cancel"))
+        self.time_feedback.set_text(self.t(self.time_message) if self.time_message else "")
+        for always, timed, _, minutes_label, _ in self.time_fields.values():
+            always.set_label(self.t("always"))
+            timed.set_label(self.t("timed"))
+            minutes_label.set_text(self.t("minutes"))
+        self.refresh_lighting_settings()
+
+    def save_lighting_settings(self):
+        options = {}
+        for model, (_, timed, minutes, _, _) in self.time_fields.items():
+            minutes.update()
+            options[model] = {"timed": timed.get_active(), "minutes": minutes.get_value_as_int()}
+        try:
+            lighting.save_preferences(options)
+        except (OSError, ValueError):
+            self.time_message = "time_error"
+        else:
+            self.time_message = "time_saved"
+        self.translate_lighting_settings()
 
     def format_log_line(self, line):
         header = line.split(maxsplit=4)
@@ -599,7 +752,7 @@ class Window(BasisFenster):
     def apply_current(self):
         self.log_event("ui.requested action=apply")
         try:
-            settings = self.current_profile("roccat")
+            settings = self.current_profile(self.draft["name"] if self.draft else "roccat")
         except ValueError:
             self.log_event("lighting.invalid")
             return
@@ -618,7 +771,7 @@ class Window(BasisFenster):
             if settings is not None:
                 status = "sent"
             try:
-                result = sdk_operation(device, settings)
+                result = lighting.apply_from_window(device, settings) if settings else sdk_operation(device)
             except BackendError as error:
                 status = str(error)
             except Exception:

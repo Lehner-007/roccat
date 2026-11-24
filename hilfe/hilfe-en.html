@@ -7,6 +7,7 @@
 <li><a href="#devices">Devices</a></li><li><a href="#lighting">Lighting</a></li>
 <li><a href="#profiles">Profiles</a></li><li><a href="#diagnostics">OpenRGB connection</a></li>
 <li><a href="#keyboard">Keyboard</a></li><li><a href="#menus">Menus</a></li>
+<li><a href="#timer">Lighting timeout</a></li>
 </ol></nav>
 <h2 id="devices">Devices</h2>
 <p>Select a model at the top. The connection status appears below the model selector. Interfaces on the same USB device are grouped. Connecting or disconnecting updates the list.</p>
@@ -16,12 +17,25 @@
 <h2 id="profiles">Profiles</h2>
 <p>In the Profiles menu, “Save locally” stores your draft as a user-owned JSON file. “Load profile” selects an existing profile for the chosen model. Settings are staged when compatible SDK capabilities are available. “Duplicate” makes a separately named copy. “Rename” moves a profile to a new name. Existing names are protected.</p>
 <p>Use the same menu to import or export JSON profiles. Import checks the format, backend and model. These file operations leave the USB device alone.</p>
-<h2 id="diagnostics">OpenRGB connection</h2>
-<p>Use a local OpenRGB SDK server on port 6742. roccat checks the connection and matches the controller by name, type and HID interface. If matching fails, check OpenRGB detection, permissions and competing services. VM tests require USB passthrough for the respective device.</p>
-<p>If HID access is blocked, an administrator can install the supplied system/70-roccat-hidraw.rules file in /etc/udev/rules.d and reload the rules. This grants access to the HID interfaces of the two models for the active local session. Then reconnect the devices one at a time.</p>
-<p>Run Installieren.sh as a regular user during installation. It sets OpenRGB up as a user service at boot. The SDK server listens on 127.0.0.1:6742. The udev device permissions take effect for the active local session.</p>
+<h2 id="timer">Lighting timeout</h2>
+<p>Open File → Settings → Lighting. For each device, choose “Always on” or “Turn off after inactivity”. With a timeout, enter 1 to 240 minutes and click “Save”. The suggested duration is 10 minutes. “Cancel” discards changes made since the last save.</p>
+<p>Any mouse or keyboard activity in the same Cinnamon session resets both timers. Separate timeout values let the keyboard turn off before the mouse. The next input restores the previously active Direct profile with its colors and available settings. “Always on” disables the inactivity timeout. A manually applied black profile stays dark.</p>
+<p>Apply a Direct profile first. The user service temporarily sets Direct colors to black. Restoring other modes can write to the device's permanent storage, so the timeout reports those modes as unsupported. Saved individual profiles are preserved. Timing requires a suitable Cinnamon session. The application explains when session idle time is unavailable.</p>
+<p>After installing the package, run <code>roccat-lichtdienst</code> once as the desktop user. The command backs up the old profile startup unit and takes over its service name. At login, the service applies the last profile applied for each model. If there is no active assignment yet, the service uses the existing <code>pc-tastatur.json</code> and <code>pc-maus.json</code> files. “Load profile” loads a draft. “Apply to device” updates the active assignment.</p>
+<p>Closing the window leaves the user service running. <code>systemctl --user stop roccat-profil-start.service</code> stops it for this session and attempts to restore lighting if the service switched it off. <code>systemctl --user start roccat-profil-start.service</code> starts it again. Startup profiles are applied after user login.</p>
+<h2 id="diagnostics">Local OpenRGB server</h2>
+<ol>
+<li>In the roccat window, select a device, edit its profile and click “Apply to device”.</li>
+<li>The Python client sends the request to the OpenRGB SDK at <code>127.0.0.1:6742</code> over TCP.</li>
+<li>The <code>roccat-openrgb.service</code> system service controls the LEDs over USB/HID. It runs under the <code>roccat-openrgb</code> service account and stores its configuration in <code>/var/lib/roccat-openrgb</code>. The packaged udev rules grant access to the HID interfaces for <code>1e7d:3124</code> and <code>1e7d:2c88</code>.</li>
+<li>The <code>roccat-profil-start.service</code> user service uses the same local connection for startup profiles and inactivity timing.</li>
+</ol>
+<p>OpenRGB runs on the PC with the attached devices. The local address is sufficient. There is no need for router port forwarding or an OMV server. The application runs with normal user permissions.</p>
+<p>USB detection and RGB controller matching are separate steps. A detected USB device is controllable only if OpenRGB reports a controller with the matching name, type and HID path. The user service retries a missing SDK or controller with increasing delays. After USB disconnection or suspend, it checks the device match again. If OpenRGB fails to detect the reconnected device, check the USB connection and OpenRGB device detection.</p>
+<p>Check the system service with <code>systemctl status roccat-openrgb.service</code> and the startup and timing log with <code>journalctl --user -u roccat-profil-start.service</code>. SDK confirmation reflects the server's state. Verify the physical LED output on the device. Close competing RGB applications. keyd is a separate input remapper and is unnecessary for lighting.</p>
 <h2 id="keyboard">Keyboard</h2>
 <p>Keyboard remapping and custom shortcuts were deliberately left out of roccat. Linux Mint Cinnamon already provides these controls under <strong>System Settings → Keyboard → Layouts</strong> and <strong>Shortcuts</strong>. roccat focuses on lighting.</p>
 <h2 id="menus">Menus</h2>
 <p>Change the language under File → Settings. It takes effect immediately. File → Quit or Q closes the app. Help contains this guide (F1), About with Info and Credits, and the log file. A fresh log starts every time the application launches. It displays entries in the current language and records status and errors without keystrokes or profile content.</p>
+<p>Use the separate “Version check” section to choose a daily, weekly or monthly check. roccat compares its installed version with the latest public release in the matching GitHub repository under Lehner-007. An overdue check runs when roccat starts. New releases are announced in the main window.</p>
 </html>

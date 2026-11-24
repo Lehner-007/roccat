@@ -7,6 +7,7 @@
 <li><a href="#devices">Geräte</a></li><li><a href="#lighting">Beleuchtung</a></li>
 <li><a href="#profiles">Profile</a></li><li><a href="#diagnostics">OpenRGB-Verbindung</a></li>
 <li><a href="#keyboard">Tastatur</a></li><li><a href="#menus">Menüs</a></li>
+<li><a href="#timer">Beleuchtungszeit</a></li>
 </ol></nav>
 <h2 id="devices">Geräte</h2>
 <p>Oben eines der beiden Modelle auswählen. Der Verbindungsstatus steht unter der Geräteauswahl. Mehrere Schnittstellen am selben USB-Anschluss gehören zu einem Gerät. Die Liste aktualisiert sich beim An- und Abstecken.</p>
@@ -16,12 +17,25 @@
 <h2 id="profiles">Profile</h2>
 <p>Im Menü „Profile“ speichert „Lokal speichern“ den aktuellen Entwurf als benutzereigene JSON-Datei. „Profil laden“ wählt ein gespeichertes Profil des ausgewählten Modells. Die Einstellungen werden vorbereitet, sobald OpenRGB passende Fähigkeiten gemeldet hat. „Duplizieren“ erstellt eine Kopie unter einem neuen Namen. „Umbenennen“ verschiebt das Profil zum neuen Namen. Bestehende Namen werden geschützt.</p>
 <p>Im selben Menü kannst du diese JSON-Profile importieren und exportieren. Der Import prüft Format, Backend und Gerätetyp. Diese Dateivorgänge ändern das USB-Gerät nicht.</p>
-<h2 id="diagnostics">OpenRGB-Verbindung</h2>
-<p>Für OpenRGB den SDK-Server lokal auf Port 6742 verwenden. roccat prüft die Verbindung und ordnet den Controller über Name, Typ und HID-Schnittstelle dem USB-Gerät zu. Bei Zuordnungsfehlern OpenRGB-Erkennung, Zugriffsrechte und konkurrierende Dienste prüfen. Für Tests in der VM das jeweilige USB-Gerät durchreichen.</p>
-<p>Wird der HID-Zugriff als gesperrt angezeigt, kann ein Administrator die mitgelieferte Regel system/70-roccat-hidraw.rules unter /etc/udev/rules.d installieren und die Regeln neu laden. Die Regel gewährt nur der aktiven lokalen Sitzung Zugriff auf die HID-Schnittstellen dieser beiden Modelle. Anschließend die Geräte einzeln neu verbinden.</p>
-<p>Führe bei der Installation Installieren.sh als normaler Benutzer aus. Das Skript richtet OpenRGB als Benutzerdienst beim Hochfahren ein. Der SDK-Server lauscht auf 127.0.0.1:6742. Die udev-Gerätefreigabe wird für die aktive lokale Sitzung wirksam.</p>
+<h2 id="timer">Beleuchtungszeit</h2>
+<p>Öffne Datei → Einstellungen → Beleuchtung. Wähle je Gerät „Immer an“ oder „Nach Inaktivität ausschalten“. Gib im zweiten Fall 1 bis 240 Minuten ein und klicke auf „Speichern“. Der Vorschlagswert beträgt 10 Minuten. „Abbrechen“ verwirft Änderungen seit dem letzten Speichern.</p>
+<p>Jede Maus- oder Tastatureingabe in derselben Cinnamon-Sitzung setzt beide Fristen zurück. Weil die Fristen getrennt sind, kann die Tastatur früher ausgehen als die Maus. Die nächste Eingabe stellt das zuvor aktive Direct-Profil mit seinen Farben und verfügbaren Parametern wieder her. „Immer an“ deaktiviert die Zeitabschaltung. Ein manuell angewendetes schwarzes Profil bleibt dunkel.</p>
+<p>Wende zuerst ein Direct-Profil an. Der Benutzerdienst verdunkelt die LEDs mit flüchtigen Direct-Farben. Bei anderen Modi kann die Wiederherstellung dauerhaft in den Gerätespeicher schreiben. Die Zeitsteuerung meldet solche Modi als ungeeignet. Gespeicherte Einzelprofile bleiben erhalten. Die Zeitsteuerung setzt eine geeignete Cinnamon-Sitzung voraus. Ist die Inaktivitätszeit dort nicht verfügbar, zeigt die Oberfläche den Grund an.</p>
+<p>Aktiviere nach der Paketinstallation als Desktop-Benutzer einmal <code>roccat-lichtdienst</code>. Der Befehl sichert die ältere Profilstart-Unit und übernimmt deren Dienstnamen. Der Dienst wendet beim Anmelden die zuletzt je Modell angewendeten Profile an. Wenn noch keine aktive Zuordnung vorliegt, verwendet er die vorhandenen Dateien <code>pc-tastatur.json</code> und <code>pc-maus.json</code>. „Profil laden“ lädt einen Entwurf. „Auf Gerät anwenden“ aktualisiert die aktive Zuordnung.</p>
+<p>Das Schließen des Fensters lässt den Benutzerdienst weiterlaufen. <code>systemctl --user stop roccat-profil-start.service</code> beendet ihn für diese Sitzung und versucht, eine zeitgesteuerte Verdunkelung rückgängig zu machen. <code>systemctl --user start roccat-profil-start.service</code> startet ihn erneut. Die Profilanwendung beginnt bei der Benutzeranmeldung.</p>
+<h2 id="diagnostics">Lokaler OpenRGB-Server</h2>
+<ol>
+<li>Wähle in der roccat-Oberfläche ein Gerät, bearbeite das Profil und klicke auf „Auf Gerät anwenden“.</li>
+<li>Der Python-Client sendet den Befehl über das OpenRGB SDK an <code>127.0.0.1:6742</code> (TCP).</li>
+<li>Der Systemdienst <code>roccat-openrgb.service</code> steuert die LEDs über USB/HID. Er läuft unter dem Dienstkonto <code>roccat-openrgb</code> und hält seine Konfiguration unter <code>/var/lib/roccat-openrgb</code>. Die Paketregeln erlauben Zugriff auf die HID-Schnittstellen für <code>1e7d:3124</code> und <code>1e7d:2c88</code>.</li>
+<li>Der Benutzerdienst <code>roccat-profil-start.service</code> nutzt dieselbe lokale Verbindung für den Profilstart und die Zeitsteuerung.</li>
+</ol>
+<p>OpenRGB läuft auf dem PC mit den angeschlossenen Geräten. Es genügt die lokale Adresse. Die Einrichtung erfordert weder eine Router-Portfreigabe noch einen OMV-Server. Die Oberfläche läuft mit normalen Benutzerrechten.</p>
+<p>Die USB-Erkennung und die RGB-Zuordnung sind getrennte Schritte. Ein USB-Gerät ist erst steuerbar, wenn OpenRGB einen Controller mit passendem Namen, Gerätetyp und HID-Pfad meldet. Bei SDK-Ausfall oder fehlendem Controller versucht der Benutzerdienst die Verbindung mit zunehmenden Wartezeiten erneut. Nach USB-Trennung oder Standby prüft er die Zuordnung erneut. Falls OpenRGB das zurückgekehrte Gerät nicht erkennt, prüfe die USB-Verbindung und die Geräteerkennung des OpenRGB-Dienstes.</p>
+<p>Prüfe den Systemdienst mit <code>systemctl status roccat-openrgb.service</code> und den Verlauf der Profil- und Zeitsteuerung mit <code>journalctl --user -u roccat-profil-start.service</code>. Ein vom SDK bestätigter Zustand beschreibt die Serverdaten. Kontrolliere die tatsächliche LED-Wirkung am Gerät. Schließe konkurrierende RGB-Programme. keyd ist ein separater Eingabe-Remapper und für die Beleuchtung entbehrlich.</p>
 <h2 id="keyboard">Tastatur</h2>
 <p>Die Tastaturbelegung und eigene Tastenkürzel wurden bewusst nicht in roccat eingebaut. Linux Mint Cinnamon bietet dafür bereits die funktionierenden Einstellungen unter <strong>Systemeinstellungen → Tastatur → Tastaturbelegungen</strong> und <strong>Tastenkombinationen</strong>. roccat konzentriert sich auf die Beleuchtung.</p>
 <h2 id="menus">Menüs</h2>
 <p>Unter Datei → Einstellungen die Sprache wechseln. Sie wird sofort übernommen. Datei → Beenden oder Q schließt das Programm. Unter Hilfe stehen diese Anleitung (F1), Über mit Info und Mitwirkenden sowie das Protokoll bereit. Bei jedem Programmstart beginnt ein neues Protokoll. Es zeigt Einträge in der aktuell eingestellten Sprache und enthält Zustände und Fehler ohne Tastatureingaben oder Profilinhalte.</p>
+<p>Im getrennten Bereich „Versionsprüfung“ wählst du täglich, wöchentlich oder monatlich. roccat vergleicht seine Programmversion mit der aktuellen öffentlichen Veröffentlichung im gleichnamigen GitHub-Repository unter Lehner-007. Ist ein fälliger Termin beim Start bereits verstrichen, prüft roccat beim Start. Eine neuere Version wird im Hauptfenster angezeigt.</p>
 </html>

@@ -12,3 +12,25 @@ Die udev-Regel vergibt dem Dienstkonto Zugriff auf die HID-Schnittstellen von Ma
 Bei Installation aus einer grafischen Sitzung erscheint zusätzlich ein ausführbarer Starter auf dem XDG-Schreibtisch. Das Paket legt den Starter für lokale grafische Sitzungen und für einen erkennbaren sudo-Benutzer an.
 
 `sudo apt remove roccat` entfernt den Desktop-Starter, das Programmprotokoll des erfassten Benutzers, die Dienstaktivierung, den OpenRGB-Dienstzustand sowie das dafür angelegte Systemkonto und seine Gruppe. Persönliche Farbprofile bleiben erhalten. Bei Version 0.1.3 räumt dpkg seinen Paketeintrag bei der Entfernung mit auf. Für einen bereits verbliebenen Paketeintrag aus Version 0.1.2 kann einmalig `sudo apt purge roccat` ausgeführt werden.
+
+## Beleuchtungszeit ab 0.1.4
+
+Nach der Paketinstallation im Terminal der Cinnamon-Sitzung als Desktop-Benutzer
+`roccat-lichtdienst` ausführen. Für einen Start aus dem Projektordner lautet der
+entsprechende Befehl `./packaging/lighting-autostart`. Die Aktivierung übernimmt
+`roccat-profil-start.service` und sichert eine bereits vorhandene Unit-Datei unter
+`~/.config/systemd/user/roccat-profil-start.service.backup-*`. Die bisherige
+Skriptdatei und die Profil-JSONs bleiben am bisherigen Pfad. Der Paketbau und die
+Paketinstallation migrieren den Benutzerdienst nicht eigenständig.
+
+Die neue Unit verwendet die letzte bestätigte aktive Zuordnung je Modell,
+andernfalls die bestehenden Profile `pc-tastatur.json` und `pc-maus.json`.
+Zeiteinstellungen und aktive Zuordnungen liegen neben dem Profilordner im
+Benutzer-Konfigurationsverzeichnis `roccat`. Beim Aktualisieren existierender
+Zeiteinstellungen wird vor dem ersten Überschreiben eine Sicherung angelegt.
+
+Für eine Rückkehr zum alten Profilstart den neuen Dienst stoppen, die gesicherte
+Unit zurückkopieren, `systemctl --user daemon-reload` ausführen und
+`systemctl --user enable --now roccat-profil-start.service` aufrufen. Auf Systemen
+ohne frühere Unit lässt sich der Dienst mit
+`systemctl --user disable --now roccat-profil-start.service` deaktivieren.

@@ -5,6 +5,7 @@ import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+AUTOMATIC_SAVE = 1 << 9
 MODELS = {
     "3124": ("ROCCAT Magma", 5, "KEYBOARD"),
     "2c88": ("ROCCAT Kone Pro", 2, "MOUSE"),
@@ -80,7 +81,7 @@ def options(controller, protocol, colors, flags, limit):
     return result
 
 
-def sdk_operation(device, settings=None):
+def sdk_operation(device, settings=None, *, volatile=False, skip_if_current=False):
     if device is not None and device not in inventory():
         raise BackendError("removed")
     try:
@@ -113,6 +114,12 @@ def sdk_operation(device, settings=None):
             if len(requested) != len(entries) or set(parameters) != set(limits):
                 raise BackendError("incompatible")
             mode = next(mode for mode in controller.modes if mode.name == mode_name)
+            if volatile and (mode.name != "Direct" or mode.color_mode != colors.PER_LED
+                             or mode.flags & AUTOMATIC_SAVE or len(requested) != limit):
+                raise BackendError("timer_unsupported")
+            update_mode = controller.active_mode != mode.id or any(
+                getattr(mode, key) != value for key, value in parameters.items()
+            )
             for key, value in parameters.items():
                 lo, hi, _ = limits[key]
                 if not lo <= value <= hi:
@@ -120,18 +127,29 @@ def sdk_operation(device, settings=None):
                 setattr(mode, key, value)
             palette = [rgb(*(int(color[i:i + 2], 16) for i in (1, 3, 5))) for color in requested]
             if mode.color_mode == colors.MODE_SPECIFIC:
+                update_mode = update_mode or mode.colors != palette
                 mode.colors = palette
             if device not in inventory():
                 raise BackendError("removed")
-            controller.set_mode(mode, save=False)
-            if controller.active_mode != mode.id:
+            if update_mode or (not volatile and not skip_if_current):
+                controller.set_mode(mode, save=False)
+            controller.update()
+            confirmed = controller.modes[controller.active_mode]
+            if (confirmed.name != mode_name
+                    or any(getattr(confirmed, key) != value for key, value in parameters.items())
+                    or (mode.color_mode == colors.MODE_SPECIFIC and confirmed.colors != palette)):
                 raise BackendError("failed")
-            if palette and mode.color_mode == colors.PER_LED:
+            if (palette and mode.color_mode == colors.PER_LED
+                    and (not (volatile or skip_if_current) or controller.colors != palette)):
                 from time import sleep
                 sleep(0.15)
                 if device not in inventory():
                     raise BackendError("removed")
-                controller.set_colors(palette, fast=True)
+                controller.set_colors(palette, fast=False)
+                if [(c.red, c.green, c.blue) for c in controller.colors] != [
+                    (c.red, c.green, c.blue) for c in palette
+                ]:
+                    raise BackendError("failed")
         return capabilities, controller.modes[controller.active_mode].name if controller.modes else ""
     finally:
         client.disconnect()

@@ -7,6 +7,7 @@ GTK-Anwendung für die Beleuchtung der ROCCAT Magma und der kabelgebundenen ROCC
 - OpenRGB erkennt die verfügbaren Modi, Farbbereiche und Regler. Änderungen werden erst mit **Auf Gerät anwenden** gesendet.
 - Farbprofile lassen sich lokal verwalten und als JSON importieren oder exportieren.
 - Das DEB richtet den Desktop-Starter und einen lokalen OpenRGB-SDK-Systemdienst auf Port 6742 ein. Der Dienst startet beim Hochfahren.
+- Je Gerät lässt sich eine Inaktivitätsfrist einstellen. Der separate Benutzerdienst steuert Direct-Profile auch bei geschlossenem Fenster. Die Versionsprüfung fragt GitHub nach neuen Veröffentlichungen.
 - Tastaturlayout und Tastenkürzel werden in Linux Mint eingestellt. roccat konzentriert sich auf Beleuchtung.
 
 [Installation und Entfernung](packaging/Installation.md) · [Hilfe](hilfe/hilfe-de.html) · [Dogtruck](https://dogtruck.eu/)
@@ -14,6 +15,8 @@ GTK-Anwendung für die Beleuchtung der ROCCAT Magma und der kabelgebundenen ROCC
 ## English
 
 roccat controls lighting on the ROCCAT Magma and wired ROCCAT Kone Pro on Linux Mint 22.x (x86-64). It uses the modes and controls reported by OpenRGB and sends changes when you select **Apply to device**. Color profiles can be stored locally and exchanged as JSON.
+
+Set a separate inactivity timeout for each device. The user service manages Direct profiles with the window closed. The version checker looks for new releases on GitHub.
 
 The DEB installs a desktop launcher and a local OpenRGB SDK service on port 6742. The service starts at boot. Keyboard layouts and shortcuts are managed in Linux Mint.
 

@@ -1,12 +1,16 @@
 """Gemeinsames GTK-3-Grundfenster für Python-Projekte."""
 from collections import deque
+from datetime import datetime
 import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 import sys
+from threading import Thread
 from urllib.parse import urlsplit
 
 import gi
+
+import versionspruefung as updates
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
@@ -19,6 +23,18 @@ TEXT = {
            "Über", "Sprache", "Stellt ein GTK-Grundfenster, einen sofortigen Sprachwechsel und eine integrierte HTML-Hilfe für neue Python-Anwendungen bereit."),
     "en": ("Python base", "File", "Settings", "Quit", "Help",
            "About", "Language", "Provides a GTK window, instant language switching and built-in HTML help for new Python applications."),
+}
+
+
+UPDATE_TEXT = {
+    "de": ("Versionsprüfung", "Jeden Tag", "1× pro Woche", "1× im Monat",
+           "Kein Update verfügbar.", "Versionsprüfung läuft …",
+           "Das Programm ist auf dem neuesten Stand.", "Neue Version {version} verfügbar.",
+           "GitHub-Abfrage fehlgeschlagen.", "Das Prüfintervall konnte nicht gespeichert werden."),
+    "en": ("Version check", "Daily", "Once a week", "Once a month",
+           "No update available.", "Checking for a new version…",
+           "The program is up to date.", "Version {version} is available.",
+           "The GitHub check failed.", "Could not save the check interval."),
 }
 
 
@@ -63,12 +79,14 @@ class BannerBild(Gtk.DrawingArea):
 
 
 class BasisFenster(Gtk.ApplicationWindow):
-    app_version = "0.1.0"
+    app_version = "1"
+    project_name = None
     logo_path = None
     contributors = ("Josef Lehner",)
     license_link = None
     hidden_log_events = frozenset()
     reset_log_on_start = False
+    log_labels = {"de": "Logfile", "en": "Logfile"}
 
     def __init__(self, application):
         super().__init__(application=application, default_width=720, default_height=460)
@@ -76,6 +94,11 @@ class BasisFenster(Gtk.ApplicationWindow):
             (code[:2] for code in GLib.get_language_names() if code[:2] in TEXT), "de"
         )
         self.settings_window = self.help_window = self.about_window = self.log_window = None
+        self.update_path = Path(GLib.get_user_config_dir()) / application.get_application_id() / "version-check.json"
+        self.update_interval, self.update_last = updates.load(self.update_path, self.project_name)
+        self.update_result = ("", "")
+        self.update_busy = False
+        self.update_closed = False
         self.log_path = Path(GLib.get_user_state_dir()) / application.get_application_id() / "programm.log"
         self.logger = logging.Logger(application.get_application_id(), logging.INFO)
         self.log_handler = None
@@ -108,6 +131,11 @@ class BasisFenster(Gtk.ApplicationWindow):
         self.add(layout)
         menu = Gtk.MenuBar()
         layout.pack_start(menu, False, False, 0)
+        self.update_bar = Gtk.InfoBar(show_close_button=True, no_show_all=True)
+        self.update_banner = Gtk.Label(xalign=0)
+        self.update_bar.get_content_area().add(self.update_banner)
+        self.update_bar.connect("response", lambda bar, _: bar.hide())
+        layout.pack_start(self.update_bar, False, False, 0)
         self.content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         workspace = Gtk.Overlay()
         watermark_path = Path(__file__).resolve().parents[1] / ".basisbilder" / "wasserzeichen.png"
@@ -129,6 +157,8 @@ class BasisFenster(Gtk.ApplicationWindow):
         self.log_item = self.add_item(help_menu, self.show_log)
         self.set_language(self.language)
         self.show_all()
+        self.update_timer = GLib.timeout_add_seconds(300, self.check_version_if_due)
+        self.check_version_if_due()
 
     def log_event(self, message, *args, level=logging.INFO):
         self.logger.log(level, message, *args)
@@ -143,6 +173,8 @@ class BasisFenster(Gtk.ApplicationWindow):
         application.quit()
 
     def close_log(self, _):
+        self.update_closed = True
+        GLib.source_remove(self.update_timer)
         for signal in self.theme_signals:
             self.theme_settings.disconnect(signal)
         self.log_event("application.window_closed")
@@ -212,10 +244,9 @@ class BasisFenster(Gtk.ApplicationWindow):
         if self.language != language:
             self.log_event("language.changed language=%s", language)
         self.language = language
-        self.log_item.set_label("Protokoll" if language == "de" else "Log file")
+        self.log_item.set_label(self.log_labels[language])
         if self.log_window is not None:
             self.log_window.set_title(self.log_item.get_label())
-        if self.log_window is not None:
             self.refresh_log(force=True)
         title, file, settings, quit_, help_, about, language_label, description = TEXT[language]
         self.set_title(title)
@@ -228,6 +259,9 @@ class BasisFenster(Gtk.ApplicationWindow):
         if self.settings_window is not None:
             self.settings_window.set_title(settings)
             self.language_label.set_text(language_label)
+            self.translate_update_settings()
+        if self.update_result[0] == "new":
+            self.update_banner.set_text(self.update_message())
         if self.about_window is not None:
             self.about_window.set_title(about)
             self.about_name.set_markup(f"<big><b>{GLib.markup_escape_text(title)}</b></big>")
@@ -259,8 +293,10 @@ class BasisFenster(Gtk.ApplicationWindow):
         self.log_event("settings.opened")
         if self.settings_window is None:
             window = self.child_window("settings_window", TEXT[self.language][2])
-            row = Gtk.Box(spacing=12, margin=18)
-            window.add(row)
+            row = Gtk.Box(spacing=12)
+            layout = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=18)
+            window.add(layout)
+            layout.pack_start(row, False, False, 0)
             self.language_label = Gtk.Label(label=TEXT[self.language][6])
             choice = Gtk.ComboBoxText()
             choice.append("de", "Deutsch")
@@ -270,8 +306,99 @@ class BasisFenster(Gtk.ApplicationWindow):
             choice.connect("changed", lambda combo: self.set_language(combo.get_active_id()))
             row.pack_start(self.language_label, False, False, 0)
             row.pack_end(choice, True, True, 0)
+            layout.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
+            self.build_update_settings(layout)
             window.show_all()
         self.settings_window.present()
+
+    def build_update_settings(self, layout):
+        self.update_frame = Gtk.Frame()
+        section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin=12)
+        self.update_frame.add(section)
+        self.update_status_label = Gtk.Label(xalign=0, wrap=True, max_width_chars=48)
+        self.update_choices = {key: Gtk.CheckButton() for key in updates.INTERVALS}
+        self.sync_update_choices()
+        self.translate_update_settings()
+        for key, button in self.update_choices.items():
+            button.connect("toggled", self.change_update_interval, key)
+            section.pack_start(button, False, False, 0)
+        section.pack_start(self.update_status_label, False, False, 0)
+        layout.pack_start(self.update_frame, False, False, 0)
+
+    def sync_update_choices(self):
+        for key, button in self.update_choices.items():
+            button.set_active(key == self.update_interval)
+
+    def translate_update_settings(self):
+        heading, daily, weekly, monthly, *_ = UPDATE_TEXT[self.language]
+        self.update_frame.set_label(heading)
+        for button, label in zip(self.update_choices.values(), (daily, weekly, monthly)):
+            button.set_label(label)
+        self.update_status_label.set_text(self.update_message())
+
+    def update_message(self):
+        status, version = self.update_result
+        messages = UPDATE_TEXT[self.language]
+        if self.update_busy:
+            return messages[5]
+        if status:
+            index = {"unavailable": 4, "current": 6, "new": 7, "error": 8, "save_error": 9}[status]
+            return messages[index].format(version=version)
+        return "" if self.project_name else messages[4]
+
+    def change_update_interval(self, button, interval):
+        if not button.get_active():
+            if interval == self.update_interval:
+                button.set_active(True)
+            return
+        if interval == self.update_interval:
+            return
+        try:
+            updates.save(self.update_path, interval, self.project_name, self.update_last)
+        except OSError:
+            self.update_result = ("save_error", "")
+        else:
+            self.update_interval = interval
+            if self.update_result[0] == "save_error":
+                self.update_result = ("", "")
+            self.check_version_if_due()
+        self.sync_update_choices()
+        self.update_status_label.set_text(self.update_message())
+
+    def check_version_if_due(self):
+        if (not self.update_busy and self.project_name
+                and updates.due(self.update_last, self.update_interval, datetime.now())):
+            self.update_busy = True
+            if self.settings_window is not None:
+                self.update_status_label.set_text(self.update_message())
+            project, installed = self.project_name, self.app_version
+
+            def check():
+                result = updates.check(project, installed)
+                GLib.idle_add(self.finish_version_check, result)
+
+            Thread(target=check, daemon=True).start()
+        return GLib.SOURCE_CONTINUE
+
+    def finish_version_check(self, result):
+        self.update_busy = False
+        if self.update_closed:
+            return
+        self.update_last = datetime.now()
+        self.update_result = result
+        self.log_event("version.check result=%s", result[0])
+        try:
+            updates.save(self.update_path, self.update_interval, self.project_name, self.update_last)
+        except OSError:
+            self.log_event("version.settings_write_failed")
+        if self.settings_window is not None:
+            self.update_status_label.set_text(self.update_message())
+        if result[0] == "new":
+            self.update_banner.set_text(self.update_message())
+            self.update_banner.show()
+            self.update_bar.show()
+        else:
+            self.update_bar.hide()
 
     def load_help(self):
         anchor = urlsplit(self.help_view.get_uri() or "").fragment

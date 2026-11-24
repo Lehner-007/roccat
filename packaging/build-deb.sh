@@ -14,13 +14,15 @@ install -d "$dest/DEBIAN" "$base" "$base/system" "$base/referenzen/original/open
 cp -R src .basis .basisbilder bilder hilfe VERSION "$base/"
 find "$base" -type d -name __pycache__ -prune -exec rm -rf {} +
 install -m 0755 "$image" "$base/system/OpenRGB.AppImage"
-install -m 0755 packaging/openrgb-service "$base/system/"
+install -m 0755 packaging/openrgb-service packaging/lighting-autostart "$base/system/"
+install -m 0644 -D packaging/roccat-profil-start.service "$dest/usr/lib/systemd/user/roccat-profil-start.service"
 install -m 0755 packaging/desktop-starter "$base/system/"
 install -m 0644 packaging/OpenRGB.json "$base/system/"
 cp -R referenzen/original/openrgb-python/openrgb referenzen/original/openrgb-python/LICENSE.md \
     "$base/referenzen/original/openrgb-python/"
 find "$base/referenzen" -type d -name __pycache__ -prune -exec rm -rf {} +
 install -m 0755 -D packaging/roccat "$dest/usr/bin/roccat"
+ln -s ../lib/roccat/system/lighting-autostart "$dest/usr/bin/roccat-lichtdienst"
 install -m 0755 packaging/roccat.desktop "$base/roccat.desktop"
 install -d "$dest/usr/share/applications"
 ln -s ../../lib/roccat/roccat.desktop "$dest/usr/share/applications/roccat.desktop"

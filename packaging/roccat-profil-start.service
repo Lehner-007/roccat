@@ -1,0 +1,15 @@
+[Unit]
+Description=ROCCAT session lighting and startup profiles
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecCondition=/usr/bin/test -f /usr/lib/roccat/src/lighting_service.py
+ExecStart=/usr/bin/python3 -B /usr/lib/roccat/src/lighting_service.py
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=45
+UMask=0077
+
+[Install]
+WantedBy=default.target
